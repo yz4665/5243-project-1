@@ -1,0 +1,307 @@
+---
+title: 'Analyzing Happy Moments: What are the effects of happiness on human being?'
+author: "Yawen Zhou"
+---
+
+```{r warning=FALSE, echo=FALSE}
+
+## Load the necessary installation packages：
+
+options(repos = c(CRAN = "https://cloud.r-project.org"))
+install.packages("lmerTest")
+install.packages("RColorBrewer")
+install.packages("plotly")
+install.packages(c("tidyverse", "tm", "textdata", "topicmodels", "wordcloud", "syuzhet"))
+library(ggplot2)
+library(plotly)
+library(conflicted)
+library(wordcloud)
+library(dplyr)
+library(tidyverse)
+library(tidyr)
+
+
+```
+
+# Introduction
+
+The quest to understand the nuances of happiness and its influence on human life forms the cornerstone of our comprehensive survey, encompassing the introspective experiences of over 100,000 participants. The study delves into the essence of happy moments, examining their immediate and lingering impacts on individuals across various demographics. This report aims to unravel the profound implications of happiness on human behavior, emotions, and social interactions, shedding light on how these fleeting instants of joy shape our lives. We explore the intricate relationship between happiness and time, the emotional spectrum that accompanies joyful experiences, and the subjective perceptions that color our experiences of happiness. The following insights offer a glimpse into the myriad ways happiness touches us, molded by our age, gender, and cultural milieu, revealing happiness as a complex interplay of personal, social, and cultural factors.
+
+Central to our exploration is the HappyDB dataset, a rich compilation of diverse information spread across five key files:
+
+cleaned_hm.csv: This file is an enhanced version of the original_hm.csv, offering a polished collection of happy moments. It includes reflective cycles, unique person IDs, and vivid expressions of joy.
+
+original_hm.csv: Serving as an unfiltered reservoir of happiness, this file preserves the raw, unedited moments of joy.
+
+Demograph.csv: This file provides a deep dive into demographic information, encompassing details like age, gender, and geographical location, adding layers of context to our analysis.
+
+senselabel.csv: Annotated and insightful, this file enriches the cleaned-up Happy Moments with lexical details, including parts of speech tags and hyper-meaning tags, enhancing our linguistic understanding.
+
+topic_dict/*-dict.csv: Offering a classified perspective, this file categorizes happy moments, aiding in the structured analysis of joy.
+
+Through this project, we embark on a journey to map the contours of happiness, leveraging the eloquence of human words and the precision of data analysis. Join us as we unlock the doors to a new realm of understanding, where data narrates the story of joy.
+
+
+
+#Data Exploration
+Firstly, reading the cleaned_hm.csv file, and creating a new variable cleaned_hm_1 that contains the result of the original cleaned_hm dataset after removing all rows that contain missing values.
+```{r warning=FALSE, echo=FALSE}
+## Reading the CSV File:
+library(readr)
+library(dplyr)
+cleaned_hm <- read_csv("/Users/yanzecheng/Desktop/HappyDB/happydb/data/cleaned_hm.csv")
+
+## Data Cleaning:
+cleaned_hm_1 <- cleaned_hm %>% filter(!is.na(cleaned_hm))
+
+
+summary(cleaned_hm_1)
+```
+#Reflection Period Analysis
+The data from our survey, which encompassed over 100,000 participants, offers fascinating insights into the recollection of happy moments and their immediate impact on individuals. Our findings reveal a nearly equal division in preferences: 49,831 individuals chose to review a happy moment that occurred within the last 24 hours, while 50,704 respondents preferred to reflect on a happy moment from up to three months ago.This could imply that happiness is not merely a fleeting emotion but has a sustained effect that can endure over weeks or even months. 
+```{r warning=FALSE, echo=FALSE}
+library(ggplot2)
+
+# Assuming 'reflection_analysis' is your data frame with the correct values.
+
+ggplot(reflection_analysis, aes(x = reflection_period, y = count, fill = reflection_period)) +
+  geom_bar(stat = "identity", width = 0.7) +
+  scale_fill_manual(values = c("lightblue", "lightpink")) +
+  geom_text(aes(label = count), vjust = -0.3, color = "black", size = 3) +
+  theme_minimal(base_size = 12) +
+  theme(
+    plot.title = element_text(size = 14, face = "bold", hjust = 0.5, vjust = 2),
+    plot.margin = margin(t = 30, r = 10, b = 10, l = 10, unit = "pt"),
+    axis.title.x = element_text(size = 12),
+    axis.title.y = element_text(size = 12)
+  ) +
+  labs(
+    title = "Reflection Period Analysis",
+    x = "Reflection Period",
+    y = "Count"
+  ) +
+  guides(fill = FALSE)  # This removes the legend for fill
+
+```
+# Sentiment Analysis
+
+Based on the sentiment analysis of over 100,000 sentences and the accompanying data, we can derive insightful conclusions about the impact of happiness on human experiences.The sentiment analysis reveals that happiness in human experiences is a rich tapestry of emotions, characterized by a dominance of positive feelings interspersed with elements of trust, anticipation, and even negative emotions. This nuanced understanding of happiness highlights its multifaceted nature and its profound impact on human life, demonstrating that happiness is not just a singular state of joy but a complex emotional experience with a wide range of influences and expressions.
+
+
+```{r warning=FALSE, echo=FALSE}
+library(syuzhet)
+## Define the batch size and calculate the number of batches required based on the number of rows in the data frame.
+
+batch_size <- 1000
+n <- nrow(cleaned_hm_1)
+n_batches <- ceiling(n / batch_size)
+
+# # Initialize an empty data frame to store the sentiment scores.
+sentiments <- data.frame()
+
+## Loop over each batch.
+for(i in 1:n_batches) {
+  start_index <- ((i - 1) * batch_size) + 1
+  end_index <- min(i * batch_size, n)
+  
+  batch <- cleaned_hm_1[start_index:end_index, ]
+  batch_sentiments <- get_nrc_sentiment(as.character(batch$cleaned_hm))
+  sentiments <- rbind(sentiments, batch_sentiments)
+  
+  print(paste("Processed batch", i, "of", n_batches))
+}
+## After the loop, the sentiments data frame contains the sentiment scores for all batches.
+```
+
+
+```{r warning=FALSE, echo=FALSE}
+# get summary
+summary(sentiments)
+```
+
+```{r warning=FALSE, echo=FALSE}
+library(ggplot2)
+# Calculate the column means for numeric columns in the sentiments data frame.
+# This gives the average score for each sentiment.
+
+sentiments_summary <- colMeans(sentiments[sapply(sentiments, is.numeric)], na.rm = TRUE)
+
+# Create a data frame from the summary statistics, 
+# with a column for sentiment names and a column for corresponding scores.
+
+
+sentiments_summary_df <- data.frame(
+  sentiment = names(sentiments_summary),
+  score = as.numeric(sentiments_summary)
+)
+
+# Plot a bar graph of the average sentiment scores using ggplot.
+
+ggplot(sentiments_summary_df, aes(x = sentiment, y = score)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  coord_flip() + 
+  ggtitle("Average Score for Each Sentiment") +
+  xlab("Sentiment") +
+  ylab("Average Score")
+
+```
+# Happiness and influencing factors
+
+```{r warning=FALSE, echo=FALSE}
+library(dplyr)
+#read csv files
+demographic_data <- read.csv("/Users/yanzecheng/Desktop/HappyDB/happydb/data/demographic.csv")
+cleaned_hm_data <- read.csv("/Users/yanzecheng/Desktop/HappyDB/happydb/data/cleaned_hm.csv")
+
+
+merged_data <- merge(demographic_data, cleaned_hm_data, by = "wid")
+
+# Create an age group variable in the merged_data
+# Age groups are determined based on the values in the 'age' column
+merged_data <- merged_data %>%
+  mutate(
+    age_group = case_when(
+      age <= 20 ~ "Under 20",
+      age > 20 & age < 31 ~ "20-29",
+      age >= 31 & age < 41 ~ "30-39",
+      age >= 41 & age < 51 ~ "40-49",
+      age >= 51 & age < 61 ~ "50-59",
+      TRUE ~ "61 and above"
+    )
+  )
+
+# Group data by age group and summarize happy moments and count for each group
+age_analysis <- merged_data %>%
+  group_by(age_group) %>%
+  summarize(
+    happy_moments = list(original_hm),
+    n = n(),
+    .groups = 'drop'
+  )
+
+# Group data by gender and summarize happy moments and count for each gender
+gender_analysis <- merged_data %>%
+  group_by(gender) %>%
+  summarize(
+    happy_moments = list(original_hm),
+    n = n(),
+    .groups = 'drop'
+  )
+
+#country
+country_analysis <- merged_data %>%
+  group_by(country) %>%
+  summarize(
+    happy_moments = list(original_hm),
+    n = n(),
+    .groups = 'drop'
+  )
+
+```
+1. Age Impact on Happiness Expression: The data reveals that people across different age groups use a similar number of words to describe happy moments, indicating a universal tendency to express happiness. Notably, individuals aged 21 to 30 are more inclined to use more sentences in describing their happy moments. This may reflect the aspirational and vibrant nature of youth, marked by a greater willingness to share and articulate feelings and experiences, possibly due to higher engagement in social activities.
+```{r warning=FALSE, echo=FALSE}
+# Visualization:
+
+ggplot(age_analysis, aes(x = age_group, y = n, fill=age_group)) + 
+  geom_bar(stat = "identity") + 
+  xlab("Age Group") + 
+  ylab("Number of Happy Moments") + 
+  ggtitle("Number of Happy Moments by Age Group")
+```
+2.Gender and Happiness Sharing: The analysis shows a significant difference in the number of happy moments shared between genders, with men sharing more than women. This discrepancy could suggest that men are more active in social events or on sharing platforms, or it could indicate a higher proportion of male users in the survey or platform.
+```{r}
+# Visualization:
+
+ggplot(gender_analysis, aes(x = gender, y = n, fill=gender)) + 
+  geom_bar(stat = "identity") + 
+  xlab("Gender Group") + 
+  ylab("Number of Happy Moments") + 
+  ggtitle("Number of Happy Moments by Gender Group")
+```
+3.Regional Influence on Happiness: The data indicates that participants from the USA shared the most number of happy moments. This likely reflects the demographic distribution of the survey or platform's user base rather than pointing to regional differences in experiencing or expressing happiness.
+```{r warning=FALSE, echo=FALSE}
+library(dplyr)
+library(ggplot2)
+
+# Assuming 'merged_data' and 'original_hm' are available in your environment
+country_analysis <- merged_data %>%
+  count(country) %>%  # This will create a dataframe with country and the count of happy moments
+  arrange(desc(n)) %>%  # Order countries by the count of happy moments
+  top_n(20, n)  # Select the top 20 countries
+
+# Now create the plot
+ggplot(data = country_analysis, aes(x = reorder(country, n), y = n, fill = country)) +
+  geom_bar(stat = "identity") +
+  coord_flip() +  # Flip the coordinates for horizontal bars
+  xlab("Country") +
+  ylab("Happy Moment Count") +
+  ggtitle("Top 20 Countries in Happiness Analysis") +
+  theme_minimal() +
+  theme(
+    legend.position = "none",  # Remove legend to clean up the plot
+    axis.text.x = element_text(size = 12),  # Increase size of x-axis labels (now on the y-axis after flip)
+    plot.title = element_text(hjust = 0.5)  # Center the plot title
+  )
+
+```
+In summary, the experience and expression of happiness are influenced by a variety of factors, including age, gender, and region. While sharing and expressing happy moments is a common human trait, the way and frequency of this expression vary significantly across different demographic groups. These variations highlight the subjective nature of happiness, suggesting that happiness is experienced and communicated differently based on individual life stages, cultural backgrounds, and social contexts. Thus, the impact of happiness on people is a complex interplay of personal, social, and cultural factors, demonstrating the rich and diverse ways in which happiness manifests in our lives.
+```{r warning=FALSE, echo=FALSE}
+
+country_analysis <- country_analysis %>%
+  arrange(desc(n))
+print(country_analysis)
+print(gender_analysis)
+print(age_analysis)
+```
+#Word clouds analysis
+Together, these word clouds suggest that happiness is not merely a fleeting emotion but a complex construct influenced by a range of experiences and interactions. The words and labels that frequently appear in descriptions of happy moments reflect the multifaceted nature of happiness and its significant impact on human well-being. Social interactions, emotional expressions, personal achievements, and time spent with loved ones are all integral components that contribute to the rich tapestry of happiness in human life.
+```{r warning=FALSE, echo=FALSE}
+install.packages("wordcloud")
+library(wordcloud)
+
+cleaned_hm <- read.csv("/Users/yanzecheng/Desktop/HappyDB/happydb/data/cleaned_hm.csv")
+senselabel<- read.csv("/Users/yanzecheng/Desktop/HappyDB/happydb/data/senselabel.csv")
+
+
+merged_senselabel <- merge(cleaned_hm, senselabel, by = "hmid")
+
+# Filter rows where MWE is not 'O', group by 'word', and count the occurrences of each word
+multi_word_expression <- merged_senselabel %>% 
+  dplyr::filter(MWE != 'O') %>%
+  group_by(word) %>%
+  summarise(count = n())
+
+# Create a word cloud for multi-word expressions
+wordcloud(words = multi_word_expression$word, freq = multi_word_expression$count, min.freq = 1, scale = c(3, 0.5), colors = brewer.pal(8, "Dark2"))
+
+# Filter rows where supersenseLabel is not NA, group by 'supersenseLabel', and count the occurrences
+super_sense_label <- merged_senselabel %>% 
+  dplyr::filter(!is.na(supersenseLabel)) %>%
+  group_by(supersenseLabel) %>%
+  summarise(count = n())
+
+# Create a word cloud for super sense labels
+wordcloud(words = super_sense_label$supersenseLabel, freq = super_sense_label$count, min.freq = 1, scale = c(3, 0.5), colors = brewer.pal(8, "Dark2"))
+
+
+```
+
+# Summary
+
+1.Temporal Reach of Happiness: Our investigation reveals that happiness holds a temporal depth, affecting individuals equally whether reflected upon after a day or savored over months. This suggests happiness has a lasting resonance, extending its embrace far beyond the moment of experience.
+
+2.Emotional Complexity: The sentiment analysis from myriad recounted joys paints happiness not as a single hue of joy but as a palette of emotions. Trust, anticipation, and even shades of negativity contribute to a rich emotional landscape, illustrating the complex nature of happiness.
+
+3.Demographic Diversity: Finally, happiness emerges as a subjective phenomenon, intricately shaped by the variables of age, gender, and cultural context. The expression and experience of happiness are as varied as the individuals themselves, highlighting the personal and cultural fabric that weaves unique experiences of joy.
+
+# References
+
+Akari Asai, Sara Evensen, Behzad Golshan, Alon Halevy, Vivian Li, Andrei Lopatenko, 
+Daniela Stepanov, Yoshihiko Suhara, Wang-Chiew Tan, Yinzhan Xu, 
+``HappyDB: A Corpus of 100,000 Crowdsourced Happy Moments'', LREC '18, May 2018. (to appear)
+
+
+
+
+
